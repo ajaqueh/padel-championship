@@ -1,0 +1,54 @@
+# frontend/src/index.css
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados */
+.loading-spinner {
+  @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
+}
+
+/* Tabla de posiciones */
+.standings-table {
+  @apply min-w-full divide-y divide-gray-200;
+}
+
+.standings-row:hover {
+  @apply bg-gray-50;
+}
+
+/* Modales */
+.modal-overlay {
+  @apply fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50;
+}
+
+.modal-container {
+  @apply relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white;
+}
+
+/* Botones personalizados */
+.btn-primary {
+  @apply bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-900 px-4 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+}
+
+/* Estados de posición */
+.position-gold {
+  @apply bg-yellow-50 border-yellow-400 border-l-4;
+}
+
+.position-silver {
+  @apply bg-gray-50 border-gray-400 border-l-4;
+}
+
+.position-bronze {
+  @apply bg-amber-50 border-amber-400 border-l-4;
+}

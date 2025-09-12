@@ -69,37 +69,3 @@ volumes:
 networks:
   padel_network:
     driver: bridge
-
-
-
-
-# .env.example
-
-# See .env.example for environment variable configuration.
-
-# frontend/.env.example
-
-# See frontend/.env.example for environment variable configuration.
-
-# init.sql
-
-# El archivo init.sql debe estar en la raíz y contener el script de inicialización de la base de datos.
-# No incluya SQL ni comentarios aquí; docker-compose.yml solo admite sintaxis YAML.
-
-# backend/tsconfig.json
-
-# See backend/tsconfig.json for TypeScript configuration.
-
-# frontend/tsconfig.json
-
-# See frontend/tsconfig.json for TypeScript configuration.
-
-# frontend/tailwind.config.js
-
-# See frontend/tailwind.config.js for Tailwind CSS configuration.
-
-# frontend/src/index.css
-
-# See frontend/src/index.css for Tailwind CSS and custom styles.
-
-
