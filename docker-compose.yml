@@ -46,12 +46,7 @@ services:
       - padel_network
     volumes:
       - ./backend/uploads:/app/uploads
-    command: >
-      sh -c "
-        npm run migrate &&
-        npm run seed &&
-        npm start
-      "
+    command: sh -c "npm run migrate && npm run seed && npm start"
 
   # Frontend React
   frontend:
