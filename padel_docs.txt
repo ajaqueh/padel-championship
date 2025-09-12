@@ -1,0 +1,514 @@
+# Sistema de Gestión de Campeonatos de Pádel
+
+## Índice
+1. [Arquitectura General](#arquitectura-general)
+2. [Modelo de Datos](#modelo-de-datos)
+3. [Algoritmos Core](#algoritmos-core)
+4. [API Endpoints](#api-endpoints)
+5. [Setup y Deployment](#setup-y-deployment)
+6. [Testing](#testing)
+7. [Mejoras Futuras](#mejoras-futuras)
+
+## Arquitectura General
+
+### Stack Tecnológico
+- **Backend**: Node.js + Express + TypeScript
+- **Base de Datos**: PostgreSQL
+- **Frontend**: React + TypeScript + Tailwind CSS
+- **Autenticación**: JWT
+- **Testing**: Jest + Supertest
+- **Containerización**: Docker + Docker Compose
+
+### Estructura del Proyecto
+```
+padel-championship/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── models/
+│   │   ├── services/
+│   │   ├── middleware/
+│   │   ├── utils/
+│   │   ├── tests/
+│   │   └── app.ts
+│   ├── migrations/
+│   ├── seeds/
+│   ├── Dockerfile
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── utils/
+│   ├── Dockerfile
+│   └── package.json
+├── docker-compose.yml
+└── README.md
+```
+
+## Modelo de Datos
+
+### Tablas Principales
+
+#### users
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'gestor')),
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### championships
+```sql
+CREATE TABLE championships (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    format VARCHAR(20) NOT NULL CHECK (format IN ('liga', 'torneo', 'americano')),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    num_groups INTEGER DEFAULT 1,
+    points_win INTEGER DEFAULT 3,
+    points_loss INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'finished')),
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### teams
+```sql
+CREATE TABLE teams (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    player1_name VARCHAR(255) NOT NULL,
+    player2_name VARCHAR(255) NOT NULL,
+    championship_id INTEGER REFERENCES championships(id) ON DELETE CASCADE,
+    group_number INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### courts
+```sql
+CREATE TABLE courts (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### matches
+```sql
+CREATE TABLE matches (
+    id SERIAL PRIMARY KEY,
+    championship_id INTEGER REFERENCES championships(id) ON DELETE CASCADE,
+    team1_id INTEGER REFERENCES teams(id),
+    team2_id INTEGER REFERENCES teams(id),
+    court_id INTEGER REFERENCES courts(id),
+    round INTEGER NOT NULL,
+    group_number INTEGER DEFAULT 1,
+    scheduled_date TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'playing', 'finished')),
+    team1_sets INTEGER DEFAULT 0,
+    team2_sets INTEGER DEFAULT 0,
+    team1_games INTEGER DEFAULT 0,
+    team2_games INTEGER DEFAULT 0,
+    winner_id INTEGER REFERENCES teams(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### match_sets
+```sql
+CREATE TABLE match_sets (
+    id SERIAL PRIMARY KEY,
+    match_id INTEGER REFERENCES matches(id) ON DELETE CASCADE,
+    set_number INTEGER NOT NULL,
+    team1_games INTEGER NOT NULL,
+    team2_games INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### standings
+```sql
+CREATE TABLE standings (
+    id SERIAL PRIMARY KEY,
+    championship_id INTEGER REFERENCES championships(id) ON DELETE CASCADE,
+    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
+    group_number INTEGER DEFAULT 1,
+    points INTEGER DEFAULT 0,
+    matches_played INTEGER DEFAULT 0,
+    matches_won INTEGER DEFAULT 0,
+    matches_lost INTEGER DEFAULT 0,
+    sets_won INTEGER DEFAULT 0,
+    sets_lost INTEGER DEFAULT 0,
+    games_won INTEGER DEFAULT 0,
+    games_lost INTEGER DEFAULT 0,
+    position INTEGER DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(championship_id, team_id)
+);
+```
+
+## Algoritmos Core
+
+### 1. Generación de Fixtures (Algoritmo de Berger)
+
+```typescript
+function generateRoundRobinFixtures(teams: Team[]): Match[] {
+    const n = teams.length;
+    const isOdd = n % 2 === 1;
+    const totalTeams = isOdd ? n + 1 : n;
+    const rounds = totalTeams - 1;
+    const matchesPerRound = totalTeams / 2;
+    
+    const fixtures: Match[] = [];
+    const teamsArray = [...teams];
+    
+    if (isOdd) {
+        teamsArray.push(null); // BYE team
+    }
+    
+    for (let round = 0; round < rounds; round++) {
+        for (let match = 0; match < matchesPerRound; match++) {
+            let home, away;
+            
+            if (match === 0) {
+                home = teamsArray[0];
+                away = teamsArray[totalTeams - 1 - round];
+            } else {
+                home = teamsArray[match];
+                away = teamsArray[totalTeams - match - round - 1];
+            }
+            
+            if (home && away) {
+                fixtures.push({
+                    team1: home,
+                    team2: away,
+                    round: round + 1
+                });
+            }
+        }
+        
+        // Rotar equipos (excepto el primero)
+        const temp = teamsArray[1];
+        for (let i = 1; i < totalTeams - 1; i++) {
+            teamsArray[i] = teamsArray[i + 1];
+        }
+        teamsArray[totalTeams - 1] = temp;
+    }
+    
+    return fixtures;
+}
+```
+
+### 2. Cálculo de Standings y Desempates
+
+```typescript
+function calculateStandings(championship: Championship, matches: Match[]): Standing[] {
+    const standings: Map<number, Standing> = new Map();
+    
+    // Inicializar standings
+    championship.teams.forEach(team => {
+        standings.set(team.id, {
+            teamId: team.id,
+            points: 0,
+            matchesPlayed: 0,
+            matchesWon: 0,
+            matchesLost: 0,
+            setsWon: 0,
+            setsLost: 0,
+            gamesWon: 0,
+            gamesLost: 0,
+            headToHead: new Map()
+        });
+    });
+    
+    // Procesar partidos
+    matches.filter(m => m.status === 'finished').forEach(match => {
+        const team1Standing = standings.get(match.team1Id)!;
+        const team2Standing = standings.get(match.team2Id)!;
+        
+        // Actualizar estadísticas básicas
+        team1Standing.matchesPlayed++;
+        team2Standing.matchesPlayed++;
+        
+        team1Standing.setsWon += match.team1Sets;
+        team1Standing.setsLost += match.team2Sets;
+        team2Standing.setsWon += match.team2Sets;
+        team2Standing.setsLost += match.team1Sets;
+        
+        team1Standing.gamesWon += match.team1Games;
+        team1Standing.gamesLost += match.team2Games;
+        team2Standing.gamesWon += match.team2Games;
+        team2Standing.gamesLost += match.team1Games;
+        
+        // Determinar ganador y actualizar puntos
+        if (match.winnerId === match.team1Id) {
+            team1Standing.matchesWon++;
+            team2Standing.matchesLost++;
+            team1Standing.points += championship.pointsWin;
+            team2Standing.points += championship.pointsLoss;
+        } else {
+            team2Standing.matchesWon++;
+            team1Standing.matchesLost++;
+            team2Standing.points += championship.pointsWin;
+            team1Standing.points += championship.pointsLoss;
+        }
+        
+        // Actualizar head-to-head
+        team1Standing.headToHead.set(match.team2Id, match);
+        team2Standing.headToHead.set(match.team1Id, match);
+    });
+    
+    return Array.from(standings.values()).sort(compareTeams);
+}
+
+function compareTeams(a: Standing, b: Standing): number {
+    // 1. Puntos
+    if (a.points !== b.points) {
+        return b.points - a.points;
+    }
+    
+    // 2. Partidos ganados
+    if (a.matchesWon !== b.matchesWon) {
+        return b.matchesWon - a.matchesWon;
+    }
+    
+    // 3. Para formato americano: total juegos ganados
+    if (championship.format === 'americano') {
+        if (a.gamesWon !== b.gamesWon) {
+            return b.gamesWon - a.gamesWon;
+        }
+    }
+    
+    // 4. Head-to-head
+    const h2h = resolveHeadToHead([a, b]);
+    if (h2h.length === 1) {
+        return h2h[0] === a ? -1 : 1;
+    }
+    
+    // 5. Diferencia de juegos
+    const aDiff = a.gamesWon - a.gamesLost;
+    const bDiff = b.gamesWon - b.gamesLost;
+    if (aDiff !== bDiff) {
+        return bDiff - aDiff;
+    }
+    
+    // 6. Sets ganados
+    if (a.setsWon !== b.setsWon) {
+        return b.setsWon - a.setsWon;
+    }
+    
+    // 7. Diferencia de sets
+    const aSetsDiff = a.setsWon - a.setsLost;
+    const bSetsDiff = b.setsWon - b.setsLost;
+    if (aSetsDiff !== bSetsDiff) {
+        return bSetsDiff - aSetsDiff;
+    }
+    
+    return 0; // Empate total - resolver por sorteo/partido extra
+}
+```
+
+## API Endpoints
+
+### Autenticación
+```
+POST /api/auth/login
+POST /api/auth/register
+POST /api/auth/refresh
+```
+
+### Campeonatos
+```
+GET /api/championships
+POST /api/championships
+GET /api/championships/:id
+PUT /api/championships/:id
+DELETE /api/championships/:id
+GET /api/championships/:id/standings
+POST /api/championships/:id/generate-fixtures
+```
+
+### Equipos
+```
+GET /api/championships/:championshipId/teams
+POST /api/championships/:championshipId/teams
+PUT /api/teams/:id
+DELETE /api/teams/:id
+POST /api/teams/import-csv
+```
+
+### Partidos
+```
+GET /api/championships/:championshipId/matches
+POST /api/matches
+PUT /api/matches/:id
+DELETE /api/matches/:id
+POST /api/matches/:id/result
+```
+
+### Canchas
+```
+GET /api/courts
+POST /api/courts
+PUT /api/courts/:id
+DELETE /api/courts/:id
+```
+
+## Setup y Deployment
+
+### Requisitos Previos
+- Docker y Docker Compose
+- Node.js 18+
+- PostgreSQL 14+
+
+### Instalación
+
+1. **Clonar repositorio**
+```bash
+git clone <repository-url>
+cd padel-championship
+```
+
+2. **Configurar variables de entorno**
+```bash
+cp .env.example .env
+# Editar .env con configuraciones necesarias
+```
+
+3. **Levantar con Docker**
+```bash
+docker-compose up --build
+```
+
+4. **Ejecutar migraciones y seeds**
+```bash
+docker-compose exec backend npm run migrate
+docker-compose exec backend npm run seed
+```
+
+5. **Ejecutar tests**
+```bash
+docker-compose exec backend npm test
+```
+
+### URLs de Acceso
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:3001
+- PostgreSQL: localhost:5432
+
+### Datos de Prueba (Seeds)
+- Admin: admin@padel.com / admin123
+- Gestor: gestor@padel.com / gestor123
+- Campeonato de ejemplo con el caso 18/16/10/10 juegos
+
+## Testing
+
+### Casos de Prueba Principales
+
+1. **Generación de Fixtures**
+   - Round-robin con número par/impar de equipos
+   - Distribución en múltiples grupos
+   - Validación de que todos se enfrentan una vez
+
+2. **Cálculo de Standings**
+   - Ordenamiento por puntos
+   - Desempate por partidos ganados
+   - Desempate por juegos ganados (formato americano)
+   - Head-to-head entre 2 equipos
+   - Head-to-head circular entre 3+ equipos
+   - Diferencia de juegos/sets
+
+3. **Caso Específico 18/16/10/10**
+   - Equipos con juegos [18, 16, 10, 10]
+   - Verificación de desempate entre equipos con 10 juegos
+   - Aplicación correcta de criterios de desempate
+
+4. **CRUD Operaciones**
+   - Creación/edición/eliminación de campeonatos
+   - Gestión de equipos y partidos
+   - Validaciones de datos
+
+5. **Autenticación y Autorización**
+   - Login/logout
+   - Verificación de roles
+   - Protección de endpoints
+
+### Comando de Ejecución
+```bash
+npm test                    # Tests unitarios
+npm run test:integration   # Tests de integración
+npm run test:coverage     # Cobertura de código
+```
+
+## Mejoras Futuras
+
+### Release 2 (Funcionalidades Avanzadas)
+1. **Formato Torneo con Eliminatorias**
+   - Fase de grupos + cuadro eliminatorio
+   - Seedings automáticos
+   - Bracket visualization
+
+2. **Formato Americano Completo**
+   - Rotación automática de parejas
+   - Rankings dinámicos por juegos ganados
+   - Múltiples rondas
+
+3. **Roles y Permisos Refinados**
+   - Rol Jugador-visualizador
+   - Permisos granulares por campeonato
+   - Gestión de múltiples clubes
+
+### Funcionalidades Adicionales
+4. **Dashboard y Reportes**
+   - Estadísticas avanzadas por jugador
+   - Gráficos de rendimiento
+   - Exportación de reportes PDF
+
+5. **Gestión de Horarios**
+   - Calendario de partidos
+   - Notificaciones automáticas
+   - Reprogramación de partidos
+
+6. **Integración con Pagos**
+   - Gestión de inscripciones pagadas
+   - Integración con pasarelas de pago
+   - Control de pagos pendientes
+
+7. **Mobile App**
+   - Aplicación móvil React Native
+   - Notificaciones push
+   - Entrada de resultados offline
+
+8. **Sistema de Livestream**
+   - Integración con cámaras
+   - Streaming de partidos importantes
+   - Grabación automática
+
+9. **AI y Analytics**
+   - Predicción de resultados
+   - Análisis de patrones de juego
+   - Recomendaciones de emparejamientos
+
+10. **Multi-tenant**
+    - Soporte para múltiples clubes
+    - Aislamiento de datos por club
+    - Facturación por uso
+
+### Mejoras Técnicas
+- Implementación de WebSockets para actualizaciones en tiempo real
+- Cache con Redis para mejor performance
+- CDN para archivos estáticos
+- Monitoreo con Prometheus/Grafana
+- CI/CD con GitHub Actions
+- Deployment en Kubernetes
