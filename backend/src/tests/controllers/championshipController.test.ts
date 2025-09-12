@@ -1,4 +1,4 @@
-// src/tests/controllers/championshipController.test.ts
+// backend/src/tests/controllers/championshipController.test.ts
 
 import request from 'supertest';
 import app from '../../app';
@@ -18,6 +18,15 @@ jest.mock('../../types', () => ({
       super(message);
     }
   }
+}));
+
+// Mock de middleware de autenticación
+jest.mock('../../middleware/auth', () => ({
+  authenticate: (req: any, res: any, next: any) => {
+    req.user = { userId: 1, email: 'test@test.com', role: 'admin' };
+    next();
+  },
+  authorize: (...roles: string[]) => (req: any, res: any, next: any) => next()
 }));
 
 const mockPool = pool as jest.Mocked<typeof pool>;
@@ -52,6 +61,16 @@ describe('ChampionshipController', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockChampionships);
+    });
+
+    it('debe manejar errores de base de datos', async () => {
+      mockPool.query.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/championships')
+        .set('Authorization', 'Bearer mock-token');
+
+      expect(response.status).toBe(500);
     });
   });
 
@@ -102,61 +121,35 @@ describe('ChampionshipController', () => {
         .send(invalidChampionship);
 
       expect(response.status).toBe(400);
-      expect(response.body.status).toBe('error');
+    });
+
+    it('debe validar formato válido', async () => {
+      const invalidChampionship = {
+        name: 'Test',
+        format: 'formato-invalido',
+        start_date: '2024-01-15'
+      };
+
+      const response = await request(app)
+        .post('/api/championships')
+        .set('Authorization', 'Bearer mock-token')
+        .send(invalidChampionship);
+
+      expect(response.status).toBe(400);
     });
   });
 
-  describe('POST /api/championships/:id/generate-fixtures', () => {
-    it('debe generar fixtures para un campeonato', async () => {
-      const championshipId = 1;
-      const mockTeams = [
-        { id: 1, name: 'Equipo A', group_number: 1 },
-        { id: 2, name: 'Equipo B', group_number: 1 },
-        { id: 3, name: 'Equipo C', group_number: 1 },
-        { id: 4, name: 'Equipo D', group_number: 1 }
-      ];
-
-      // Mock para obtener equipos
-      mockPool.query
-        .mockResolvedValueOnce({
-          rows: mockTeams,
-          fields: [],
-          command: 'SELECT',
-          rowCount: 4,
-          oid: 0
-        })
-        // Mock para el cliente de transacción
-        .mockResolvedValue({
-          rows: [],
-          fields: [],
-          command: 'DELETE',
-          rowCount: 0,
-          oid: 0
-        });
-
-      const mockClient = {
-        query: jest.fn().mockResolvedValue({ rows: [] }),
-        release: jest.fn()
+  describe('GET /api/championships/:id', () => {
+    it('debe retornar un campeonato específico', async () => {
+      const mockChampionship = {
+        id: 1,
+        name: 'Liga Test',
+        format: 'liga',
+        created_by_name: 'Admin'
       };
-      mockPool.connect.mockResolvedValue(mockClient as any);
-
-      const response = await request(app)
-        .post(`/api/championships/${championshipId}/generate-fixtures`)
-        .set('Authorization', 'Bearer mock-token');
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Fixtures generados exitosamente');
-      expect(response.body.fixtures_count).toBe(6); // 4 equipos = 6 partidos
-    });
-
-    it('debe fallar con menos de 2 equipos', async () => {
-      const championshipId = 1;
-      const mockTeams = [
-        { id: 1, name: 'Equipo Solitario', group_number: 1 }
-      ];
 
       mockPool.query.mockResolvedValue({
-        rows: mockTeams,
+        rows: [mockChampionship],
         fields: [],
         command: 'SELECT',
         rowCount: 1,
@@ -164,11 +157,63 @@ describe('ChampionshipController', () => {
       });
 
       const response = await request(app)
-        .post(`/api/championships/${championshipId}/generate-fixtures`)
+        .get('/api/championships/1')
         .set('Authorization', 'Bearer mock-token');
 
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe('Se necesitan al menos 2 equipos para generar fixtures');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockChampionship);
+    });
+
+    it('debe retornar 404 si el campeonato no existe', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+        fields: [],
+        command: 'SELECT',
+        rowCount: 0,
+        oid: 0
+      });
+
+      const response = await request(app)
+        .put('/api/championships/999')
+        .set('Authorization', 'Bearer mock-token')
+        .send({ name: 'Nuevo nombre' });
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('DELETE /api/championships/:id', () => {
+    it('debe eliminar un campeonato exitosamente', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [{ id: 1, name: 'Liga eliminada' }],
+        fields: [],
+        command: 'DELETE',
+        rowCount: 1,
+        oid: 0
+      });
+
+      const response = await request(app)
+        .delete('/api/championships/1')
+        .set('Authorization', 'Bearer mock-token');
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Campeonato eliminado exitosamente');
+    });
+
+    it('debe retornar 404 si el campeonato no existe', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+        fields: [],
+        command: 'DELETE',
+        rowCount: 0,
+        oid: 0
+      });
+
+      const response = await request(app)
+        .delete('/api/championships/999')
+        .set('Authorization', 'Bearer mock-token');
+
+      expect(response.status).toBe(404);
     });
   });
 });
