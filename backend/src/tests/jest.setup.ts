@@ -131,7 +131,7 @@ describe('Edge Cases', () => {
     const championship = createMockChampionship();
     const sorted = standings.sort((a, b) => 
       (StandingsService as any).compareTeams(a, b, championship)
-    );
+    )
 
     expect(sorted[0].team_id).toBe(2); // Con puntos primero
     expect(sorted[1].team_id).toBe(1); // Sin puntos segundo
