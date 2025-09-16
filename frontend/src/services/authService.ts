@@ -1,17 +1,13 @@
-// src/services/authService.ts
-
 import { apiClient } from './apiClient';
-import { User } from '../types';
+import { User, LoginResponse } from '../types';
 
 export const authService = {
-  async login(email: string, password: string): Promise<{ user: User; token: string }> {
+  async login(email: string, password: string): Promise<LoginResponse> {
     const response = await apiClient.post('/auth/login', { email, password });
     return response.data;
   },
 
   async getCurrentUser(): Promise<User> {
-    // Esta función debería implementarse en el backend
-    // Por ahora, decodificaremos el token del localStorage
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('No token found');

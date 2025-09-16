@@ -1,11 +1,24 @@
-// src/components/common/LoadingSpinner.tsx
-
 import React from 'react';
 
-export const LoadingSpinner: React.FC = () => {
+interface LoadingSpinnerProps {
+  size?: 'sm' | 'md' | 'lg';
+  text?: string;
+}
+
+export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
+  size = 'md', 
+  text = 'Cargando...' 
+}) => {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12'
+  };
+
   return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    <div className="flex flex-col items-center justify-center py-8">
+      <div className={`loading-spinner ${sizeClasses[size]}`}></div>
+      {text && <p className="mt-4 text-gray-600 text-sm">{text}</p>}
     </div>
   );
 };

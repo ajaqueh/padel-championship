@@ -1,217 +1,221 @@
-// src/components/championships/CreateChampionshipModal.tsx
-
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import React, { useState } from 'react';
 import { championshipService } from '../../services/championshipService';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
 interface CreateChampionshipModalProps {
   onClose: () => void;
+  onSuccess: () => void;
 }
 
 interface FormData {
   name: string;
   format: 'liga' | 'torneo' | 'americano';
   start_date: string;
-  end_date?: string;
+  end_date: string;
   num_groups: number;
   points_win: number;
   points_loss: number;
 }
 
 export const CreateChampionshipModal: React.FC<CreateChampionshipModalProps> = ({
-  onClose
+  onClose,
+  onSuccess
 }) => {
-  const queryClient = useQueryClient();
-  
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch
-  } = useForm<FormData>({
-    defaultValues: {
-      format: 'liga',
-      num_groups: 1,
-      points_win: 3,
-      points_loss: 0
-    }
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    format: 'liga',
+    start_date: '',
+    end_date: '',
+    num_groups: 1,
+    points_win: 3,
+    points_loss: 0
   });
 
-  const createMutation = useMutation(championshipService.create, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('championships');
-      toast.success('Campeonato creado exitosamente');
-      onClose();
-    }
-  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const onSubmit = (data: FormData) => {
-    createMutation.mutate(data);
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+	setLoading(true);
+		setError('');
 
-  const watchedFormat = watch('format');
+		try {
+		  await championshipService.create(formData);
+		  onSuccess();
+		} catch (error: any) {
+		  setError(error.response?.data?.message || 'Error al crear campeonato');
+		} finally {
+		  setLoading(false);
+		}
+	  };
 
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">
-            Crear Nuevo Campeonato
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
-        </div>
+	  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+		const { name, value } = e.target;
+		setFormData(prev => ({
+		  ...prev,
+		  [name]: name === 'num_groups' || name === 'points_win' || name === 'points_loss' 
+			? parseInt(value) || 0 
+			: value
+		}));
+	  };
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Nombre del Campeonato
-            </label>
-            <input
-              type="text"
-              {...register('name', { required: 'El nombre es requerido' })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-            )}
-          </div>
+	  return (
+		<Modal
+		  isOpen={true}
+		  onClose={onClose}
+		  title="Crear Nuevo Campeonato"
+		  size="lg"
+		>
+		  <form onSubmit={handleSubmit} className="space-y-4">
+			{error && (
+			  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+				{error}
+			  </div>
+			)}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Formato
-            </label>
-            <select
-              {...register('format', { required: 'El formato es requerido' })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="liga">Liga (Round-Robin)</option>
-              <option value="torneo">Torneo (Fase de grupos + Eliminatorias)</option>
-              <option value="americano">Americano (Todos contra todos)</option>
-            </select>
-          </div>
+			<div>
+			  <label className="block text-sm font-medium text-gray-700 mb-1">
+				Nombre del Campeonato
+			  </label>
+			  <input
+				type="text"
+				name="name"
+				required
+				value={formData.name}
+				onChange={handleChange}
+				className="input"
+				placeholder="Ej: Liga de Pádel Verano 2024"
+			  />
+			</div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Fecha de Inicio
-              </label>
-              <input
-                type="date"
-                {...register('start_date', { required: 'La fecha es requerida' })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-              {errors.start_date && (
-                <p className="mt-1 text-sm text-red-600">{errors.start_date.message}</p>
-              )}
-            </div>
+			<div>
+			  <label className="block text-sm font-medium text-gray-700 mb-1">
+				Formato
+			  </label>
+			  <select
+				name="format"
+				value={formData.format}
+				onChange={handleChange}
+				className="input"
+			  >
+				<option value="liga">Liga (Round-Robin)</option>
+				<option value="torneo">Torneo (Fase de grupos + Eliminatorias)</option>
+				<option value="americano">Americano (Todos contra todos)</option>
+			  </select>
+			</div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Fecha de Fin (Opcional)
-              </label>
-              <input
-                type="date"
-                {...register('end_date')}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
+			<div className="grid grid-cols-2 gap-4">
+			  <div>
+				<label className="block text-sm font-medium text-gray-700 mb-1">
+				  Fecha de Inicio
+				</label>
+				<input
+				  type="date"
+				  name="start_date"
+				  required
+				  value={formData.start_date}
+				  onChange={handleChange}
+				  className="input"
+				/>
+			  </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Número de Grupos
-            </label>
-            <input
-              type="number"
-              min="1"
-              {...register('num_groups', { 
-                required: 'El número de grupos es requerido',
-                min: { value: 1, message: 'Debe ser al menos 1' }
-              })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-            {errors.num_groups && (
-              <p className="mt-1 text-sm text-red-600">{errors.num_groups.message}</p>
-            )}
-          </div>
+			  <div>
+				<label className="block text-sm font-medium text-gray-700 mb-1">
+				  Fecha de Fin (Opcional)
+				</label>
+				<input
+				  type="date"
+				  name="end_date"
+				  value={formData.end_date}
+				  onChange={handleChange}
+				  className="input"
+				/>
+			  </div>
+			</div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Puntos por Victoria
-              </label>
-              <input
-                type="number"
-                min="0"
-                {...register('points_win', { 
-                  required: 'Los puntos por victoria son requeridos',
-                  min: { value: 0, message: 'Debe ser 0 o mayor' }
-                })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+			<div>
+			  <label className="block text-sm font-medium text-gray-700 mb-1">
+				Número de Grupos
+			  </label>
+			  <input
+				type="number"
+				name="num_groups"
+				min="1"
+				required
+				value={formData.num_groups}
+				onChange={handleChange}
+				className="input"
+			  />
+			</div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Puntos por Derrota
-              </label>
-              <input
-                type="number"
-                min="0"
-                {...register('points_loss', { 
-                  min: { value: 0, message: 'Debe ser 0 o mayor' }
-                })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
+			<div className="grid grid-cols-2 gap-4">
+			  <div>
+				<label className="block text-sm font-medium text-gray-700 mb-1">
+				  Puntos por Victoria
+				</label>
+				<input
+				  type="number"
+				  name="points_win"
+				  min="0"
+				  required
+				  value={formData.points_win}
+				  onChange={handleChange}
+				  className="input"
+				/>
+			  </div>
 
-          {/* Información adicional según el formato */}
-          {watchedFormat && (
-            <div className="bg-blue-50 p-3 rounded-md">
-              <h4 className="text-sm font-medium text-blue-900 mb-1">
-                Sobre el formato {watchedFormat}:
-              </h4>
-              <p className="text-sm text-blue-800">
-                {watchedFormat === 'liga' && 
-                  'Todos los equipos se enfrentan una vez. Ideal para campeonatos regulares.'
-                }
-                {watchedFormat === 'torneo' && 
-                  'Fase de grupos seguida de eliminación directa. Formato tradicional de torneos.'
-                }
-                {watchedFormat === 'americano' && 
-                  'El ranking se basa en total de juegos ganados. Aplicación de reglas especiales de desempate.'
-                }
-              </p>
-            </div>
-          )}
+			  <div>
+				<label className="block text-sm font-medium text-gray-700 mb-1">
+				  Puntos por Derrota
+				</label>
+				<input
+				  type="number"
+				  name="points_loss"
+				  min="0"
+				  value={formData.points_loss}
+				  onChange={handleChange}
+				  className="input"
+				/>
+			  </div>
+			</div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isLoading}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {createMutation.isLoading ? 'Creando...' : 'Crear Campeonato'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+			{/* Información adicional según el formato */}
+			{formData.format && (
+			  <div className="bg-blue-50 p-4 rounded-md">
+				<h4 className="text-sm font-medium text-blue-900 mb-2">
+				  Sobre el formato {formData.format}:
+				</h4>
+				<p className="text-sm text-blue-800">
+				  {formData.format === 'liga' && 
+					'Todos los equipos se enfrentan una vez. Ideal para campeonatos regulares.'
+				  }
+				  {formData.format === 'torneo' && 
+					'Fase de grupos seguida de eliminación directa. Formato tradicional de torneos.'
+				  }
+				  {formData.format === 'americano' && 
+					'El ranking se basa en total de juegos ganados. Aplicación de reglas especiales de desempate.'
+				  }
+				</p>
+			  </div>
+			)}
+
+			<div className="flex justify-end space-x-3 pt-4">
+			  <Button
+				type="button"
+				variant="secondary"
+				onClick={onClose}
+			  >
+				Cancelar
+			  </Button>
+			  <Button
+				type="submit"
+				loading={loading}
+			  >
+				Crear Campeonato
+			  </Button>
+			</div>
+		  </form>
+		</Modal>
+	  );
+	};

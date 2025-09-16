@@ -1,7 +1,4 @@
-// src/services/apiClient.ts
-
 import axios from 'axios';
-import toast from 'react-hot-toast';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -31,9 +28,6 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const message = error.response?.data?.message || 'Error en la solicitud';
-    toast.error(message);
-    
     return Promise.reject(error);
   }
 );

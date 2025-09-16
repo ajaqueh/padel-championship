@@ -1,5 +1,3 @@
-// src/components/common/ProtectedRoute.tsx
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,7 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner text="Verificando autenticación..." />;
   }
 
   if (!user) {
@@ -26,7 +24,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (requiredRole && user.role !== requiredRole && user.role !== 'admin') {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-64">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Acceso Denegado</h2>
           <p className="text-gray-600 mt-2">

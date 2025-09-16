@@ -1,15 +1,14 @@
-// src/pages/LoginPage.tsx
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { Button } from '../components/ui/Button';
 
 export const LoginPage: React.FC = () => {
   const { login, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -18,12 +17,12 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
       await login(email, password);
-      toast.success('¡Bienvenido!');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Error al iniciar sesión');
+      setError(error.response?.data?.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -40,21 +39,28 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900">🏆</h1>
+          <h2 className="mt-4 text-3xl font-extrabold text-gray-900">
             Pádel Championship Manager
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-600">
             Sistema de gestión de campeonatos de pádel
           </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email
               </label>
               <input
@@ -64,12 +70,12 @@ export const LoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="relative block w-full px-3 py-2 border border-gray-300 rounded-t-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email"
+                className="input mt-1"
+                placeholder="tu@email.com"
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Contraseña
               </label>
               <input
@@ -79,20 +85,20 @@ export const LoginPage: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="relative block w-full px-3 py-2 border border-gray-300 rounded-b-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Contraseña"
+                className="input mt-1"
+                placeholder="Tu contraseña"
               />
             </div>
           </div>
 
           <div>
-            <button
+            <Button
               type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              loading={loading}
+              className="w-full"
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </button>
+            </Button>
           </div>
 
           <div className="mt-6">
@@ -106,20 +112,22 @@ export const LoginPage: React.FC = () => {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => handleDemoLogin('admin')}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                className="w-full"
               >
                 Admin Demo
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => handleDemoLogin('gestor')}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                className="w-full"
               >
                 Gestor Demo
-              </button>
+              </Button>
             </div>
 
             <div className="mt-4 text-center">

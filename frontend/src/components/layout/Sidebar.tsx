@@ -1,21 +1,17 @@
-// src/components/layout/Sidebar.tsx
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  HomeIcon,
-  TrophyIcon,
-  UserGroupIcon,
-  CalendarIcon,
-  ChartBarIcon,
-  BuildingOfficeIcon
-} from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Campeonatos', href: '/championships', icon: TrophyIcon },
-  { name: 'Canchas', href: '/courts', icon: BuildingOfficeIcon }
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: string;
+}
+
+const navigation: NavigationItem[] = [
+  { name: 'Dashboard', href: '/dashboard', icon: '🏠' },
+  { name: 'Campeonatos', href: '/championships', icon: '🏆' },
+  { name: 'Canchas', href: '/courts', icon: '🏟️' }
 ];
 
 export const Sidebar: React.FC = () => {
@@ -24,7 +20,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <div className="w-64 bg-white shadow-lg">
-      <div className="p-6">
+      <div className="p-6 border-b border-gray-200">
         <h1 className="text-2xl font-bold text-gray-900">Pádel Manager</h1>
         <p className="text-sm text-gray-600 mt-1">
           {user?.role === 'admin' ? 'Administrador' : 'Gestor'}
@@ -40,22 +36,29 @@ export const Sidebar: React.FC = () => {
                 key={item.name}
                 to={item.href}
                 className={`
-                  group flex items-center px-3 py-2 text-sm font-medium rounded-md mb-1
+                  group flex items-center px-3 py-2 text-sm font-medium rounded-md mb-1 transition-colors
                   ${isActive 
                     ? 'bg-blue-100 text-blue-700' 
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }
                 `}
               >
-                <item.icon 
-                  className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-500' : 'text-gray-400'}`} 
-                />
+                <span className={`mr-3 text-lg ${isActive ? 'text-blue-500' : 'text-gray-400'}`}>
+                  {item.icon}
+                </span>
                 {item.name}
               </Link>
             );
           })}
         </div>
       </nav>
+
+      <div className="absolute bottom-6 left-6 right-6">
+        <div className="text-xs text-gray-500 text-center">
+          <p>Sistema v1.0.0</p>
+          <p>Release 1 (MVP)</p>
+        </div>
+      </div>
     </div>
   );
 };

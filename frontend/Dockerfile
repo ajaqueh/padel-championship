@@ -1,32 +1,42 @@
-# frontend/Dockerfile
+	# Build stage
+	FROM node:18-alpine as build
 
-# Build stage
-FROM node:18-alpine as build
+	WORKDIR /app
 
-WORKDIR /app
+	# Copiar archivos de package
+	COPY package*.json ./
 
-# Copiar package.json y package-lock.json
-COPY package*.json ./
+	# Instalar dependencias
+	RUN npm install
 
-# Instalar dependencias
-RUN npm ci
+	# Copiar código fuente
+	COPY . .
 
-# Copiar código fuente
-COPY . .
+	# Construir aplicación
+	RUN npm run build
 
-# Construir la aplicación
-RUN npm run build
+	# Production stage
+	FROM nginx:alpine
 
-# Production stage
-FROM nginx:alpine
+	# Copiar build
+	COPY --from=build /app/build /usr/share/nginx/html
 
-# Copiar build de React
-COPY --from=build /app/build /usr/share/nginx/html
+	# Configuración básica de nginx
+	RUN echo 'server { \
+		listen 80; \
+		location / { \
+			try_files $uri $uri/ /index.html; \
+		} \
+		location /api/ { \
+			proxy_pass http://backend:3001/api/; \
+			proxy_set_header Host $host; \
+			proxy_set_header X-Real-IP $remote_addr; \
+			proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+			proxy_set_header X-Forwarded-Proto $scheme; \
+		} \
+	}' > /etc/nginx/conf.d/default.conf
 
-# Copiar configuración de nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+	# Exponer puerto
+	EXPOSE 80
 
-# Exponer puerto
-EXPOSE 3000
-
-CMD ["nginx", "-g", "daemon off;"]
+	CMD ["nginx", "-g", "daemon off;"]

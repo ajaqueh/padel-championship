@@ -1,40 +1,46 @@
-// src/pages/StandingsPage.tsx
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from 'react-query';
 import { championshipService } from '../services/championshipService';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { 
-  TrophyIcon, 
-  ChartBarIcon,
-  ArrowUpIcon,
-  ArrowDownIcon
-} from '@heroicons/react/24/outline';
+import { Championship, Standing } from '../types';
 
 export const StandingsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const championshipId = parseInt(id!);
+  
+  const [championship, setChampionship] = useState<Championship | null>(null);
+  const [standings, setStandings] = useState<Standing[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const { data: championship, isLoading: isLoadingChampionship } = useQuery(
-    ['championship', championshipId],
-    () => championshipService.getById(championshipId)
-  );
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [championshipData, standingsData] = await Promise.all([
+          championshipService.getById(championshipId),
+          championshipService.getStandings(championshipId)
+        ]);
+        
+        setChampionship(championshipData);
+        setStandings(standingsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const { data: standings, isLoading: isLoadingStandings } = useQuery(
-    ['standings', championshipId],
-    () => championshipService.getStandings(championshipId)
-  );
+    fetchData();
+  }, [championshipId]);
 
-  if (isLoadingChampionship || isLoadingStandings) {
-    return <LoadingSpinner />;
+  if (loading) {
+    return <LoadingSpinner text="Cargando posiciones..." />;
   }
 
   const getPositionIcon = (position: number) => {
-    if (position === 1) return <TrophyIcon className="h-5 w-5 text-yellow-500" />;
-    if (position === 2) return <div className="h-5 w-5 bg-gray-300 rounded-full flex items-center justify-center text-xs font-bold">2</div>;
-    if (position === 3) return <div className="h-5 w-5 bg-amber-600 rounded-full flex items-center justify-center text-xs font-bold text-white">3</div>;
-    return <span className="text-gray-500 font-semibold">{position}</span>;
+    if (position === 1) return '🥇';
+    if (position === 2) return '🥈';
+    if (position === 3) return '🥉';
+    return position.toString();
   };
 
   const getPositionRowClass = (position: number) => {
@@ -81,9 +87,9 @@ export const StandingsPage: React.FC = () => {
         </div>
       )}
 
-      {standings && standings.length > 0 ? (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
+      {standings.length > 0 ? (
+        <div className="card">
+          <div className="border-b border-gray-200 pb-4 mb-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">
                 Posiciones Actuales
@@ -139,7 +145,8 @@ export const StandingsPage: React.FC = () => {
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex items-center space-x-2">
-                          {getPositionIcon(standing.position)}
+                          <span className="text-lg">{getPositionIcon(standing.position)}</span>
+                          <span className="text-gray-600">#{standing.position}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -195,7 +202,7 @@ export const StandingsPage: React.FC = () => {
           </div>
 
           {/* Leyenda */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="text-xs text-gray-600 space-y-1">
               <p><strong>PJ:</strong> Partidos Jugados | <strong>PG:</strong> Partidos Ganados | <strong>PP:</strong> Partidos Perdidos</p>
               <p><strong>Pts:</strong> Puntos | <strong>Sets:</strong> Sets Ganados-Perdidos | <strong>Juegos:</strong> Juegos Ganados-Perdidos | <strong>Dif:</strong> Diferencia de Juegos</p>
@@ -203,7 +210,7 @@ export const StandingsPage: React.FC = () => {
           </div>
 
           {/* Criterios de desempate */}
-          <div className="px-6 py-4 bg-blue-50 border-t border-blue-200">
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded p-4">
             <h4 className="text-sm font-semibold text-blue-900 mb-2">Criterios de Desempate (en orden):</h4>
             <div className="text-xs text-blue-800 space-y-1">
               <p>1. Puntos obtenidos</p>
@@ -218,12 +225,12 @@ export const StandingsPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="text-center py-12 bg-white shadow sm:rounded-lg">
-          <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+        <div className="text-center py-12 card">
+          <div className="text-6xl mb-4">📊</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
             No hay datos disponibles
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-gray-500">
             Los standings se calcularán automáticamente cuando haya partidos finalizados
           </p>
         </div>

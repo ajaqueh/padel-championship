@@ -1,5 +1,3 @@
-// src/services/championshipService.ts
-
 import { apiClient } from './apiClient';
 import { Championship, Standing } from '../types';
 

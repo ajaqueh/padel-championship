@@ -1,5 +1,3 @@
-// src/types/index.ts
-
 export interface User {
   id: number;
   email: string;
@@ -93,4 +91,22 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+}
+
+// API Response types
+export interface ApiResponse<T> {
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  token: string;
+  message: string;
+}
+
+export interface StandingsResponse {
+  standings: Standing[];
+  updated_at: string;
 }
